@@ -13,6 +13,10 @@ class Group:
         return "Group: " + str(self.id) + " - (" + str(self.nodes) + ")"
     def __repr__(self):
         return self.__str__()
+    def __ge__(self, other):
+        return len(self.connections) >= len(other.connections)
+    def __lt__(self, other):
+        return len(self.connections) < len(other.connections)
 
 class Node:
     def __init__(self, id, connections):
@@ -23,6 +27,10 @@ class Node:
         return "Node: " + str(self.id)
     def __repr__(self):
         return "Node: " + str(self.id)
+    def __ge__(self, other):
+        return len(self.connections) >= len(other.connections)
+    def __lt__(self, other):
+        return len(self.connections) < len(other.connections)
 
 class Level:
     def __init__(self, groups, translation):
@@ -100,7 +108,7 @@ def group_nodes(nodes):
     id = 0
     tmp_groups = {}
     translation = {}
-    for node in nodes.values():
+    for node in sorted(nodes.values()):
         if picked.get(node.id, False):
             continue
         picked[node.id] = True
