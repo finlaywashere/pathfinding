@@ -1,34 +1,90 @@
-#!/bin/python
 import time
+import heapq
 
-pre_start = time.time()
-
-class Group:
-    def __init__(self, id, nodes, connections):
+class Vertex():
+    def __init__(self, id, children, edges):
         self.id = id
-        self.nodes = nodes
-        self.connections = connections
+        self.children = children
+        self.edges = edges
+        self.compute_weighting()
 
     def __str__(self):
-        return "Group: " + str(self.id) + " - (" + str(self.nodes) + ")"
+        return str(children)
     def __repr__(self):
         return self.__str__()
+    def __hash__(self):
+        return self.id
 
-class Node:
-    def __init__(self, id, connections):
-        self.id = id
-        self.connections = connections
+    def compute_weighting(self):
+        """
+        Computes an internal weighting for the density of the graph under this vertex
+        Edges are in the format (weight, vertex)
+        """
+        max1 = None
+        max2 = None
+        for edge in self.edges:
+            if max1 is None:
+                max1 = edge
+                continue
+            if max2 is None:
+                max2 = edge
+                continue
+            if edge[0] > max1[0]:
+                max1 = edge
+            elif edge[0] > max2[0]:
+                max2 = edge
+        if max2 is not None:
+            self.internal_weight = max1[0] + max2[0]
+        else:
+            self.internal_weight = max1[0]
 
-    def __str__(self):
-        return "Node: " + str(self.id)
-    def __repr__(self):
-        return "Node: " + str(self.id)
-
-class Level:
-    def __init__(self, groups, translation):
-        self.groups = groups
+def Level():
+    def __init__(self, vertices, translation):
+        self.vertices = vertices
         self.translation = translation
+    
+    def internal_pathfind(self, start, end, parent_path):
+        """
+        This pathfinds internally within a given level
+        This restricts the path searched to be within the parent path's children
+        """
+        graph = set()
+        for vertex in parent_path:
+            graph.update(vertex.children)
+        queue = [[self.vertices[start]]]
+        visited = set()
+        dist = {start: 0}
+        while queue:
+            path = heapq.heappop(queue)
+            vertex = path[-1]
+            visited.add(vertex)
+            curr_dist = dist[vertex]
+            if vertex == end:
+                print("Found", curr_dist)
+                return path
+            for edge in vertex.edges:
+                connected_vertex = self.vertices[edge[1]]
+                # Compute weighting that accoounts for graph density
+                edge_weighting = edge[0] + vertex.internal_weight + connected_vertex.internal_weight
+                new_dist = curr_dist + edge[0]
+                if dist.get(connected_vertex, 1000000) > new_dist:
+                    dist[connected_vertex] = new_dist
+                    new_path = list(path)
+                    new_path.append(connected_vertex)
+                    heapq.heappush(queue, new_path)
+        print("Not found")
+        return None
 
+def group_vertices(level: Level):
+    vertices = set(level.vertices.values())
+    new_vertices = {}
+    translation = {}
+    id = 0
+    while len(vertices) > 0:
+        vertex = vertices.pop()
+        
+
+pre_start = time.time()
 input = open("graph.txt", "r")
 lines = input.readlines()
 first = True
@@ -45,141 +101,23 @@ for line in lines:
         for c in cons:
             if c == "":
                 continue
-            c = int(c)
-            c_list += [c]
+            spl = c.split(".")
+            c = int(spl[0])
+            weight = int(spl[1])
+            c_list += [(weight, c)]
             o_list = l1_cons.get(c, [])
-            o_list += [id]
+            o_list += [(weight, id)]
             l1_cons[c] = o_list
         l1_cons[id] = c_list
 
-l1_nodes = {}
+l1_vertices = {}
 for key, value in l1_cons.items():
-    l1_nodes[key] = Node(key, value)
+    l1_vertices[key] = Vertex(key, None, edges)
+level1 = Level(l1_vertices, {})
 
-def level_pathfind(start, end, path, levels, levelnum):
-    newpath = [start]
-    uplevel = levels[levelnum+1]
-    downlevel = levels[levelnum]
-    for i in range(1, len(path)):
-        last_newpath = newpath[-1]
-        prevgroup = uplevel.groups[uplevel.translation[last_newpath.id]]
-        group = path[i]
-        found = False
-        if isinstance(group, Group):
-            for node in group.nodes:
-                if node.id in last_newpath.connections:
-                    newpath += [node]
-                    found = True
-                    break
-        else:
-            newpath += [group]
-        if found:
-            continue
-        for node in prevgroup.nodes:
-            if node != last_newpath:
-                newpath += [node]
-                last_newpath = node
-                break
-        # Now do it again
-        if isinstance(group, Group):
-            for node in group.nodes:
-                if node.id in last_newpath.connections and node not in newpath:
-                    newpath += [node]
-                    found = True
-                    break
-        else:
-            newpath += [group]
-        if not found:
-            print("Graph not connected!")
-    if newpath[-1].id != end.id:
-        newpath += [end] # Always will end up in same group as end node
-    return newpath
-
-def group_nodes(nodes):
-    picked = {}
-    id = 0
-    tmp_groups = {}
-    translation = {}
-    for node in nodes.values():
-        if picked.get(node.id, False):
-            continue
-        picked[node.id] = True
-        translation[node.id] = id
-        group = [node]
-        neighbour = None
-        for n2 in node.connections:
-            if picked.get(n2, False):
-                continue
-            neighbour = n2
-            picked[neighbour] = True
-            translation[neighbour] = id
-            break
-        if neighbour is not None:
-            group += [nodes[neighbour]]
-        tmp_groups[id] = group
-        id += 1
-    groups = {}
-    for id, nodes in tmp_groups.items():
-        cons = set()
-        for node in nodes:
-            for con in node.connections:
-                cons.add(translation[con])
-        group = Group(id, nodes, cons)
-        groups[id] = group
-    return Level(groups, translation)
-
-translation = {}
-for key in l1_nodes.keys():
-    translation[key] = key
-
-levels = [Level(l1_nodes, translation)]
-i = 0
+levels = [level1]
 while True:
-    new_level = group_nodes(levels[i].groups)
-    levels += [new_level]
-    print(str(len(levels[i].groups)) + " -> " + str(len(levels[i+1].groups)))
-    if len(levels[i].groups) == len(levels[i+1].groups):
-        break
-    i += 1
-
-pre_time = time.time() - pre_start
-
-print("Converged in", i, "iterations")
-print("Preprocessor took", pre_time, "seconds")
-
-run_start = time.time()
-
-START = 100
-END = 370
-
-start_groups = {}
-end_groups = {}
-first_common = -1
-for i in range(len(levels)):
-    level = levels[i]
-    if i == 0:
-        start_groups[i] = START
-        end_groups[i] = END
-    else:
-        start_groups[i] = level.translation[start_groups[i-1]]
-        end_groups[i] = level.translation[end_groups[i-1]]
-    if start_groups[i] == end_groups[i]:
-        first_common = i
-        break
-print(start_groups)
-print(end_groups)
-# level_pathfind(start, end, path, levels, levelnum):
-path = []
-for levelnum in range(first_common-1, -1, -1):
-    level = levels[levelnum]
-    start = level.groups[start_groups[levelnum]]
-    end = level.groups[end_groups[levelnum]]
-    if levelnum == first_common-1:
-        path = [start, end]
-        continue
-    path = level_pathfind(start, end, path, levels, levelnum)
-
-run_time = time.time() - run_start
-print("Final path", path)
-print("Path length", len(path))
-print("Found path in", run_time, "seconds")
+    if len(levels) > 1 and len(levels[-1].vertices.keys()) == len(levels[-2].vertices.keys()):
+        print("CONVERGED AT", len(levels), "WITH", len(levels[-1].vertices.keys()), "VERTICES")
+    levels.append(group_vertices(levels[-1])
+    print("iteration", len(levels), "-", len(levels[-1].vertices.keys()))
