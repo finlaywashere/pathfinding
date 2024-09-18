@@ -5,7 +5,7 @@ import time
 
 start_time = time.time()
 
-NUM_NODES = 10000
+NUM_NODES = 100000
 CONS_PER_NODE = 5
 
 output = open("graph.txt", "w")

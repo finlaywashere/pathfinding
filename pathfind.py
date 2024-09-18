@@ -15,8 +15,9 @@ class Vertex:
     def __hash__(self):
         return self.id
     def depth(self):
-        if len(self.children) > 0 and self.children.values().get(0) is not None:
-            return self.children.values().get(0).depth + 1
+        children_list = list(self.children)
+        if len(self.children) > 0 and isinstance(children_list[0], Vertex):
+            return children_list[0].depth + 1
         else:
             return 1
     def compute_weighting(self):
@@ -53,8 +54,11 @@ class Level:
         This restricts the path searched to be within the parent path's children
         """
         graph = set()
-        for vertex in parent_path:
-            graph.update(vertex.children)
+        if parent_path is not None:
+            for vertex in parent_path:
+                graph.update(vertex.children)
+        else:
+            graph.update(self.vertices.values())
         counter = 1
         queue = [(0,0,[self.vertices[start]])]
         dist = {start: 0}
@@ -62,8 +66,7 @@ class Level:
             path = heapq.heappop(queue)[2]
             vertex = path[-1]
             curr_dist = dist[vertex.id]
-            print(vertex.depth(), end.depth())
-            if vertex == end:
+            if vertex.id == end:
                 print("Found", curr_dist)
                 return path
             for edge in vertex.edges:
@@ -156,7 +159,7 @@ pre_end = time.time()
 print("Converged in", (pre_end-pre_start), "seconds")
 
 START = 100
-END = 200
+END = 10001
 start = time.time()
 
 lowest_common = -1
@@ -179,11 +182,22 @@ path = [levels[lowest_common+1].vertices[start_group]]
 for i in range(lowest_common, -1, -1):
     print("level", i)
     level = levels[i]
-    start_group = level_maps[i][0]
-    end_group = level_maps[i][1]
+    if i > 0:
+        start_group = level_maps[i][0]
+        end_group = level_maps[i][1]
+    else:
+        start_group = START
+        end_group = END
     path = level.internal_pathfind(start_group, end_group, path)
-    print("Path length:", len(path))
+    print("Path length:", len(path), "/", len(levels[i].vertices))
 
 end = time.time()
 print("Search took", (end-start), "seconds")
+print("Path:", path)
 
+start = time.time()
+path = level.internal_pathfind(START, END, None)
+end = time.time()
+print("Djikstra took", (end-start), "seconds")
+print("Djikstra path", path)
+print("Path length", len(path))
