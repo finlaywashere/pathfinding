@@ -59,26 +59,39 @@ class Level:
                 graph.update(vertex.children)
         else:
             graph.update(self.vertices.values())
+        print("Search space", len(graph))
         counter = 1
-        queue = [(0,0,[self.vertices[start]])]
+        queue = [(0,0,self.vertices[start])]
         dist = {start: 0}
+        visited = set()
         while queue:
-            path = heapq.heappop(queue)[2]
-            vertex = path[-1]
+            vertex = heapq.heappop(queue)[2]
+            #if vertex.id in visited:
+            #    continue
+            visited.add(vertex.id)
             curr_dist = dist[vertex.id]
             if vertex.id == end:
-                print("Found", curr_dist)
-                return path
+                predecessors = {}
+                for vertex, distance in dist.items():
+                    vertex_obj = self.vertices[vertex]
+                    for weight, neighbour, _src in self.vertices[vertex].edges:
+                        weight += vertex_obj.internal_weight + self.vertices[neighbour].internal_weight
+                        if dist[neighbour] == distance + weight:
+                            predecessors[neighbour] = vertex
+                            break
+                path = [end]
+                print("ew",dist[end])
+                while path[-1] != start:
+                    path.append(predecessors[path[-1]])
+                return path.reverse()
             for edge in vertex.edges:
                 connected_vertex = self.vertices[edge[1]]
                 # Compute weighting that accoounts for graph density
                 edge_weighting = edge[0] + vertex.internal_weight + connected_vertex.internal_weight
-                new_dist = curr_dist + edge[0]
+                new_dist = curr_dist + edge_weighting
                 if dist.get(connected_vertex.id, 1000000) > new_dist:
                     dist[connected_vertex.id] = new_dist
-                    new_path = list(path)
-                    new_path.append(connected_vertex)
-                    heapq.heappush(queue, (new_dist, counter, new_path))
+                    heapq.heappush(queue, (new_dist, counter, connected_vertex))
                     counter += 1
         print("Not found")
         return None
@@ -188,7 +201,9 @@ for i in range(lowest_common, -1, -1):
     else:
         start_group = START
         end_group = END
+    level_start = time.time()
     path = level.internal_pathfind(start_group, end_group, path)
+    print("Level took", (time.time()-level_start), "seconds")
     print("Path length:", len(path), "/", len(levels[i].vertices))
 
 end = time.time()
