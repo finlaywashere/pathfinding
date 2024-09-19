@@ -1,5 +1,6 @@
 import time
 import heapq
+import dijkstra
 
 class Vertex:
     def __init__(self, id, children, edges):
@@ -9,17 +10,11 @@ class Vertex:
         self.compute_weighting()
 
     def __str__(self):
-        return str(self.id) + " - " + str(self.children)
+        return "<" + str(self.id) + ">"
     def __repr__(self):
         return self.__str__()
     def __hash__(self):
         return self.id
-    def depth(self):
-        children_list = list(self.children)
-        if len(self.children) > 0 and isinstance(children_list[0], Vertex):
-            return children_list[0].depth + 1
-        else:
-            return 1
     def compute_weighting(self):
         """
         Computes an internal weighting for the density of the graph under this vertex
@@ -53,48 +48,27 @@ class Level:
         This pathfinds internally within a given level
         This restricts the path searched to be within the parent path's children
         """
-        graph = set()
+        graph = dijkstra.Graph()
+        counter = 0
         if parent_path is not None:
             for vertex in parent_path:
-                graph.update(vertex.children)
-        else:
-            graph.update(self.vertices.values())
-        print("Search space", len(graph))
-        counter = 1
-        queue = [(0,0,self.vertices[start])]
-        dist = {start: 0}
-        visited = set()
-        while queue:
-            vertex = heapq.heappop(queue)[2]
-            #if vertex.id in visited:
-            #    continue
-            visited.add(vertex.id)
-            curr_dist = dist[vertex.id]
-            if vertex.id == end:
-                predecessors = {}
-                for vertex, distance in dist.items():
-                    vertex_obj = self.vertices[vertex]
-                    for weight, neighbour, _src in self.vertices[vertex].edges:
-                        weight += vertex_obj.internal_weight + self.vertices[neighbour].internal_weight
-                        if dist[neighbour] == distance + weight:
-                            predecessors[neighbour] = vertex
-                            break
-                path = [end]
-                print("ew",dist[end])
-                while path[-1] != start:
-                    path.append(predecessors[path[-1]])
-                return path.reverse()
-            for edge in vertex.edges:
-                connected_vertex = self.vertices[edge[1]]
-                # Compute weighting that accoounts for graph density
-                edge_weighting = edge[0] + vertex.internal_weight + connected_vertex.internal_weight
-                new_dist = curr_dist + edge_weighting
-                if dist.get(connected_vertex.id, 1000000) > new_dist:
-                    dist[connected_vertex.id] = new_dist
-                    heapq.heappush(queue, (new_dist, counter, connected_vertex))
+                for child in vertex.children:
                     counter += 1
-        print("Not found")
-        return None
+                    for edge in self.vertices[child].edges:
+                        graph.add_edge(child, edge[1], edge[0])
+        else:
+            for vertex in self.vertices.values():
+                counter += 1
+                for edge in vertex.edges:
+                    graph.add_edge(vertex.id, edge[1], edge[0])
+        print("Search space:", counter)
+        paths = dijkstra.DijkstraSPF(graph, start)
+        path = paths.get_path(end)
+        print("DIJ Path", path)
+        vertex_path = []
+        for elem in path:
+            vertex_path.append(self.vertices[elem])
+        return vertex_path
 
 def group_vertices(level: Level, max_in_group):
     vertices = set(level.vertices.values())
@@ -129,7 +103,7 @@ def group_vertices(level: Level, max_in_group):
         new_vertices[gid] = vert
     return Level(new_vertices, translation)
 
-MAX_IN_GROUP = 50
+MAX_IN_GROUP = 20
 
 pre_start = time.time()
 input = open("graph.txt", "r")
@@ -182,17 +156,18 @@ end_group = END
 level_maps = {}
 for i in range(1, len(levels)):
     level = levels[i]
-    level_maps[i] = (start_group, end_group)
+    level_maps[i-1] = (start_group, end_group)
     start_group = level.translation[start_group]
     end_group = level.translation[end_group]
     if start_group == end_group:
         lowest_common = i
         break
+print(levels[2].vertices[18].children, "-", levels[2].translation[32])
 if lowest_common == -1:
     print("Disconnected")
     exit()
 path = [levels[lowest_common+1].vertices[start_group]]
-for i in range(lowest_common, -1, -1):
+for i in range(lowest_common-1, -1, -1):
     print("level", i)
     level = levels[i]
     if i > 0:
@@ -201,6 +176,7 @@ for i in range(lowest_common, -1, -1):
     else:
         start_group = START
         end_group = END
+    print("start", start_group, "end", end_group)
     level_start = time.time()
     path = level.internal_pathfind(start_group, end_group, path)
     print("Level took", (time.time()-level_start), "seconds")
