@@ -5,8 +5,8 @@ import time
 
 start_time = time.time()
 
-NUM_NODES = 100000
-CONS_PER_NODE = 5
+NUM_NODES = 10000
+CONS_PER_NODE = 2
 
 output = open("graph.txt", "w")
 output.write(str(NUM_NODES) + "\n")
@@ -19,7 +19,7 @@ for i in range(NUM_NODES):
         cons.remove(i)
     output.write(str(i) + ":")
     for val in cons:
-        output.write(str(val) + "." + str(random.randint(0, 10)) + ",")
+        output.write(str(val) + "." + str(random.randint(3, 10)) + ",")
     output.write("\n")
 
 total_time = time.time() - start_time
